@@ -44,4 +44,18 @@ export const config = {
         const pk = process.env.PRIVATE_KEY as `0x${string}` | undefined;
         return pk ? privateKeyToAccount(pk).address : undefined;
     },
+
+    // Database
+    databaseUrl: process.env.DATABASE_URL ?? "postgresql://localhost:5432/arcstock",
+
+    // Stork Network Oracle
+    storkApiUrl: process.env.STORK_API_URL ?? "https://rest.jp.stork-oracle.network",
+    storkAuthToken: process.env.STORK_AUTH_TOKEN,
+
+    // Gemini AI
+    geminiApiKey: process.env.GEMINI_API_KEY,
+    geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.0-flash-exp",
+
+    // Agent Settings
+    agentSchedulerInterval: parseInt(process.env.AGENT_SCHEDULER_INTERVAL ?? "300", 10), // 5 minutes
 } as const;
