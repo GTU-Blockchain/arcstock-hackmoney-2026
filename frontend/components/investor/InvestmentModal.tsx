@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useAccount, useSignTypedData } from "wagmi";
+import { useState, useEffect } from "react";
+import { useAccount, useSignTypedData, useReadContract, useWriteContract } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
+import { parseUnits } from "viem";
 import { Modal, ModalFooter } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -14,7 +16,20 @@ import {
   getBalances,
   type IntentResponse,
 } from "@/lib/api";
-import { CHAIN_TO_DOMAIN } from "@/lib/wagmi";
+import { CHAIN_TO_DOMAIN, CHAIN_USDC, GATEWAY_WALLET } from "@/lib/wagmi";
+
+const GATEWAY_WALLET_ABI = [
+  {
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "depositor", type: "address" },
+    ],
+    name: "totalBalance",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
 
 const CHAIN_NAMES: Record<number, string> = {
   11155111: "Sepolia",
@@ -44,6 +59,11 @@ export function InvestmentModal({
   const [step, setStep] = useState<"input" | "sign" | "complete">("input");
   const [intent, setIntent] = useState<IntentResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [depositSuccess, setDepositSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) setDepositSuccess(false);
+  }, [isOpen]);
 
   const { address, isConnected, chainId } = useAccount();
   const sourceDomain = chainId ? CHAIN_TO_DOMAIN[chainId] : undefined;
@@ -55,14 +75,55 @@ export function InvestmentModal({
     enabled: !!address && isOpen,
   });
 
+  const usdcAddress = chainId ? CHAIN_USDC[chainId] : undefined;
+  const { data: directBalance } = useReadContract({
+    address: usdcAddress,
+    chainId,
+    abi: [
+      {
+        inputs: [{ name: "account", type: "address" }],
+        name: "balanceOf",
+        outputs: [{ name: "", type: "uint256" }],
+        stateMutability: "view",
+        type: "function",
+      },
+    ] as const,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+  });
+
+  const { data: gatewayOnChainBalance } = useReadContract({
+    address: GATEWAY_WALLET,
+    chainId,
+    abi: GATEWAY_WALLET_ABI,
+    functionName: "totalBalance",
+    args: usdcAddress && address ? [usdcAddress, address] : undefined,
+  });
+
   const balanceForChain = sourceDomain
     ? balancesData?.balances?.find((b) => b.domain === sourceDomain)?.balance ??
       "0"
     : "0";
-  const walletBalance = parseFloat(balanceForChain) || 0;
+  const gatewayApiBalance = parseFloat(balanceForChain) || 0;
+  const gatewayOnChain = gatewayOnChainBalance ? Number(gatewayOnChainBalance) / 1e6 : 0;
+  const pendingForDomain = (balancesData?.pendingDeposits ?? [])
+    .filter((d) => d.domain === sourceDomain)
+    .reduce((sum, d) => {
+      const amt = parseFloat(d.amount);
+      return sum + (amt > 1e6 ? amt / 1e6 : amt);
+    }, 0);
+  const gatewayDisplayBalance = Math.max(gatewayApiBalance, gatewayOnChain, pendingForDomain);
+  const gatewayBalance = gatewayApiBalance;
+  const directBalanceFormatted = directBalance
+    ? Number(directBalance) / 1e6
+    : 0;
   const chainName = chainId ? CHAIN_NAMES[chainId] ?? `Chain ${chainId}` : "—";
+  const needsDeposit = gatewayBalance === 0 && directBalanceFormatted > 0;
+  const investableBalance = gatewayBalance;
 
   const { signTypedDataAsync, isPending: isSigning } = useSignTypedData();
+  const { writeContractAsync, isPending: isDepositing } = useWriteContract();
+  const queryClient = useQueryClient();
 
   if (!company) return null;
 
@@ -72,12 +133,41 @@ export function InvestmentModal({
   const companyId = parseInt(company.id, 10);
 
   const handleMaxAmount = () => {
-    setAmount(walletBalance.toString());
+    setAmount((investableBalance > 0 ? investableBalance : directBalanceFormatted).toString());
+  };
+
+  const handleDeposit = async () => {
+    if (!usdcAddress || !address || directBalanceFormatted <= 0) return;
+    setError(null);
+    setDepositSuccess(false);
+    const depositAmountWei = parseUnits(directBalanceFormatted.toFixed(6), 6);
+    try {
+      await writeContractAsync({
+        address: usdcAddress,
+        abi: [
+          { inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }], name: "approve", outputs: [{ name: "", type: "bool" }], stateMutability: "nonpayable", type: "function" },
+        ] as const,
+        functionName: "approve",
+        args: [GATEWAY_WALLET, depositAmountWei],
+      });
+      await writeContractAsync({
+        address: GATEWAY_WALLET,
+        abi: [
+          { inputs: [{ name: "token", type: "address" }, { name: "value", type: "uint256" }], name: "deposit", outputs: [], stateMutability: "nonpayable", type: "function" },
+        ] as const,
+        functionName: "deposit",
+        args: [usdcAddress, depositAmountWei],
+      });
+      setDepositSuccess(true);
+      await queryClient.invalidateQueries({ queryKey: ["balances", address] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Deposit failed");
+    }
   };
 
   const handleSubmit = async () => {
     setError(null);
-    if (!address || !isSupportedChain || amountNum <= 0 || amountNum > walletBalance) {
+    if (!address || !isSupportedChain || amountNum <= 0 || amountNum > investableBalance) {
       return;
     }
 
@@ -115,8 +205,14 @@ export function InvestmentModal({
       setAmount("");
       setIntent(null);
       setStep("input");
+      setDepositSuccess(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Investment failed");
+      const msg = err instanceof Error ? err.message : "Investment failed";
+      setError(
+        msg.includes("Insufficient balance")
+          ? "Gateway reports insufficient balance. Deposit your wallet USDC to Gateway first (Deposit button above), or wait 1–2 min after depositing for block confirmations."
+          : msg
+      );
       setStep("input");
     }
   };
@@ -143,8 +239,10 @@ export function InvestmentModal({
 
         {isConnected && !isSupportedChain && (
           <p className="text-sm text-amber-600 dark:text-amber-400">
-            Switch to Base Sepolia, Sepolia, or Avalanche Fuji to use your USDC
-            balance.
+            {chainId === 5042002
+              ? "USDC on Arc Testnet cannot be used for investment. Switch to Base Sepolia, Sepolia, or Avalanche Fuji to invest."
+              : "Switch to Base Sepolia, Sepolia, or Avalanche Fuji to use your USDC."
+            }
           </p>
         )}
 
@@ -167,10 +265,13 @@ export function InvestmentModal({
             />
             <div className="flex justify-between text-xs font-medium">
               <span className="text-slate-500">
-                Balance:{" "}
-                {balancesLoading
+                {balancesLoading && !directBalance
                   ? "Loading..."
-                  : `${walletBalance.toLocaleString()} USDC`}
+                  : needsDeposit
+                    ? `Wallet: ${directBalanceFormatted.toLocaleString()} USDC · Gateway: 0 USDC`
+                    : gatewayDisplayBalance > investableBalance
+                      ? `Balance: ${gatewayDisplayBalance.toLocaleString()} USDC (${investableBalance.toLocaleString()} available, rest pending)`
+                      : `Balance on ${chainName}: ${investableBalance.toLocaleString()} USDC`}
               </span>
               <button
                 onClick={handleMaxAmount}
@@ -180,6 +281,43 @@ export function InvestmentModal({
                 Max Amount
               </button>
             </div>
+            {depositSuccess && (
+              <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-3">
+                <p className="text-xs text-emerald-800 dark:text-emerald-200 font-medium">
+                  Deposit successful!
+                </p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
+                  Gateway balance updates in <strong>10–20 minutes</strong> (block finality). Your funds are safe, just wait for confirmations.
+                </p>
+              </div>
+            )}
+            {needsDeposit && !depositSuccess && (
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 space-y-2">
+                <p className="text-xs text-amber-800 dark:text-amber-200">
+                  You have USDC in your wallet but it must be deposited into the Gateway before investing.
+                </p>
+                <Button
+                  onClick={handleDeposit}
+                  size="sm"
+                  disabled={isDepositing || step !== "input"}
+                >
+                  {isDepositing ? "Depositing..." : "Deposit to Gateway"}
+                </Button>
+              </div>
+            )}
+            {isSupportedChain && !needsDeposit && directBalanceFormatted === 0 && gatewayBalance === 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                You need USDC on <strong>{chainName}</strong>. Get testnet USDC from{" "}
+                <a
+                  href="https://faucet.circle.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline font-medium"
+                >
+                  faucet.circle.com
+                </a>
+              </p>
+            )}
           </div>
         )}
 
@@ -233,8 +371,9 @@ export function InvestmentModal({
             !isConnected ||
             !isSupportedChain ||
             amountNum <= 0 ||
-            amountNum > walletBalance ||
+            amountNum > investableBalance ||
             isSigning ||
+            isDepositing ||
             step !== "input"
           }
         >

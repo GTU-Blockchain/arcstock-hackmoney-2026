@@ -85,7 +85,7 @@ contract EquityRegistry {
     }
 
     /**
-     * @notice Mint shares for a company. Called by agent/company after investment settlement.
+     * @notice Mint shares for a company. Called by agent/company for issuance.
      */
     function mintShares(uint256 companyId_, address to, uint256 amount) external onlyAuthorized {
         Company storage c = companies[companyId_];
@@ -93,6 +93,18 @@ contract EquityRegistry {
         if (!c.active) revert CompanyInactive();
 
         EquityToken(c.equityToken).mint(to, amount);
+    }
+
+    /**
+     * @notice Transfer shares from company wallet to investor. Used when selling from company pool.
+     * Company wallet must have approved this registry via EquityToken.approve(registry, amount).
+     */
+    function transferFromCompany(uint256 companyId_, address to, uint256 amount) external onlyAuthorized {
+        Company storage c = companies[companyId_];
+        if (c.id == 0) revert CompanyNotFound();
+        if (!c.active) revert CompanyInactive();
+
+        EquityToken(c.equityToken).transferFrom(c.companyWallet, to, amount);
     }
 
     /**

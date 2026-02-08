@@ -22,6 +22,47 @@ export interface GetBalancesResponse {
     balances: GatewayBalance[];
 }
 
+export interface GatewayDeposit {
+    depositor: string;
+    domain: number;
+    transactionHash: string;
+    amount: string;
+    status: string;
+    blockHeight?: string;
+    blockHash?: string;
+    blockTimestamp?: string;
+}
+
+export interface GetDepositsResponse {
+    token: string;
+    deposits: GatewayDeposit[];
+}
+
+/**
+ * Get pending deposits for a depositor
+ * POST /v1/deposits
+ */
+export async function getDeposits(
+    depositor: string,
+    domains: number[] = [0, 1, 6, 26],
+): Promise<GetDepositsResponse> {
+    const res = await fetch(`${BASE_URL}/v1/deposits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            token: "USDC",
+            sources: domains.map((domain) => ({ domain, depositor })),
+        }),
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Gateway deposits error ${res.status}: ${err}`);
+    }
+
+    return res.json();
+}
+
 /**
  * Get unified USDC balance across chains for a depositor
  * POST /v1/balances

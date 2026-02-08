@@ -122,7 +122,7 @@ export default function LoginPage() {
                             </Link>
                         )}
                         <p className="text-center text-slate-500 text-xs">
-                            Brave kullanıyorsanız: brave://settings/web3 adresinde varsayılan cüzdanı &quot;Extensions&quot; (MetaMask) olarak ayarlayın.
+                            If using Brave: set default wallet to &quot;Extensions&quot; (MetaMask) at brave://settings/web3.
                         </p>
                     </div>
 

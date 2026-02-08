@@ -1,173 +1,154 @@
+"use client";
+
+import { useAccount } from "wagmi";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { InvestorHeader } from "@/components/layout/InvestorHeader";
 import { PortfolioStats } from "@/components/investor/PortfolioStats";
-import { Badge } from "@/components/ui/Badge";
+import { GatewayBalanceCard } from "@/components/investor/GatewayBalanceCard";
 import { Button } from "@/components/ui/Button";
-
-const holdings = [
-    {
-        id: "1",
-        company: "Tesla Inc.",
-        ticker: "TSLA-EQ",
-        shares: 150,
-        avgPrice: 138.50,
-        currentPrice: 142.68,
-        value: 21402,
-        change: 3.02,
-    },
-    {
-        id: "2",
-        company: "SpaceX",
-        ticker: "SPACEX-EQ",
-        shares: 50,
-        avgPrice: 95.00,
-        currentPrice: 102.40,
-        value: 5120,
-        change: 7.79,
-    },
-    {
-        id: "3",
-        company: "Stripe",
-        ticker: "STRIPE-EQ",
-        shares: 200,
-        avgPrice: 45.20,
-        currentPrice: 48.90,
-        value: 9780,
-        change: 8.19,
-    },
-];
+import {
+  getCompanies,
+  getInvestorPortfolio,
+  mapApiCompanyToCompany,
+} from "@/lib/api";
 
 export default function PortfolioPage() {
-    const totalValue = holdings.reduce((sum, h) => sum + h.value, 0);
-    const totalCost = holdings.reduce((sum, h) => sum + h.shares * h.avgPrice, 0);
-    const totalGain = totalValue - totalCost;
-    const totalGainPct = ((totalValue - totalCost) / totalCost) * 100;
+  const { address, isConnected } = useAccount();
 
-    return (
-        <div className="min-h-screen bg-slate-950">
-            <InvestorHeader />
+  const { data: companies = [] } = useQuery({
+    queryKey: ["companies"],
+    queryFn: getCompanies,
+  });
 
-            <main className="max-w-7xl mx-auto px-6 py-8">
-                {/* Page Header */}
-                <div className="mb-8">
-                    <h1 className="text-white text-3xl font-bold mb-2">Portfolio</h1>
-                    <p className="text-slate-400">
-                        Manage your equity holdings across all chains
-                    </p>
-                </div>
+  const { data: portfolio = [] } = useQuery({
+    queryKey: ["portfolio", address],
+    queryFn: () => getInvestorPortfolio(address!),
+    enabled: !!address,
+  });
 
-                {/* Portfolio Summary */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-slate-900 rounded-xl border border-slate-800 p-6">
-                        <p className="text-slate-400 text-xs uppercase tracking-wider mb-2">
-                            Total Value
-                        </p>
-                        <p className="text-white text-3xl font-bold">
-                            ${totalValue.toLocaleString()}
-                        </p>
-                    </div>
-                    <div className="bg-slate-900 rounded-xl border border-slate-800 p-6">
-                        <p className="text-slate-400 text-xs uppercase tracking-wider mb-2">
-                            Total Gain/Loss
-                        </p>
-                        <p className={`text-3xl font-bold ${totalGain >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                            {totalGain >= 0 ? "+" : ""}${totalGain.toLocaleString()}
-                        </p>
-                        <p className={`text-sm ${totalGain >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                            {totalGainPct >= 0 ? "+" : ""}{totalGainPct.toFixed(2)}%
-                        </p>
-                    </div>
-                    <div className="bg-slate-900 rounded-xl border border-slate-800 p-6">
-                        <p className="text-slate-400 text-xs uppercase tracking-wider mb-2">
-                            Holdings
-                        </p>
-                        <p className="text-white text-3xl font-bold">{holdings.length}</p>
-                    </div>
-                    <div className="bg-slate-900 rounded-xl border border-slate-800 p-6">
-                        <p className="text-slate-400 text-xs uppercase tracking-wider mb-2">
-                            Dividends Received
-                        </p>
-                        <p className="text-white text-3xl font-bold">$842</p>
-                    </div>
-                </div>
+  const mappedCompanies = companies.map(mapApiCompanyToCompany);
 
-                {/* Holdings Table */}
-                <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-                    <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-                        <h2 className="text-white text-xl font-bold">Your Holdings</h2>
-                        <Button variant="secondary" size="sm">
-                            <span className="material-symbols-outlined text-sm mr-2">download</span>
-                            Export
-                        </Button>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-slate-800">
-                                    <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-4">
-                                        Company
-                                    </th>
-                                    <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-4">
-                                        Shares
-                                    </th>
-                                    <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-4">
-                                        Avg. Price
-                                    </th>
-                                    <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-4">
-                                        Current Price
-                                    </th>
-                                    <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-4">
-                                        Value
-                                    </th>
-                                    <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-4">
-                                        Change
-                                    </th>
-                                    <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-4">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {holdings.map((holding) => (
-                                    <tr
-                                        key={holding.id}
-                                        className="border-b border-slate-800/50 hover:bg-slate-800/30"
-                                    >
-                                        <td className="px-6 py-4">
-                                            <div>
-                                                <p className="text-white font-medium">{holding.company}</p>
-                                                <p className="text-slate-400 text-sm">{holding.ticker}</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-white">
-                                            {holding.shares}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-slate-400">
-                                            ${holding.avgPrice.toFixed(2)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-white font-medium">
-                                            ${holding.currentPrice.toFixed(2)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-white font-bold">
-                                            ${holding.value.toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <Badge variant={holding.change >= 0 ? "success" : "danger"}>
-                                                {holding.change >= 0 ? "+" : ""}{holding.change.toFixed(2)}%
-                                            </Badge>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="sm">Buy</Button>
-                                                <Button variant="ghost" size="sm">Sell</Button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </main>
+  const holdings = portfolio.map((p) => {
+    const company = mappedCompanies.find((c) => c.id === String(p.companyId));
+    const shares = parseFloat(p.balance) / 1e18;
+    const sharePrice = company?.sharePrice ?? 0;
+    const value = shares * sharePrice;
+    return {
+      companyId: p.companyId,
+      company: p.companyName,
+      ticker: p.symbol,
+      shares,
+      sharePrice,
+      value,
+    };
+  });
+
+  const totalValue = holdings.reduce((sum, h) => sum + h.value, 0);
+  const portfolioStats = {
+    totalInvested: totalValue,
+    sharesOwned: holdings.reduce((sum, h) => sum + h.shares, 0),
+    dividendsReceived: 0,
+    companiesCount: holdings.length,
+    monthlyGrowth: 0,
+    yieldPercentage: 0,
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950">
+      <InvestorHeader />
+
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        <div className="mb-8">
+          <h1 className="text-white text-3xl font-bold mb-2">Portfolio</h1>
+          <p className="text-slate-400">
+            Manage your equity holdings across all chains
+          </p>
         </div>
-    );
+
+        {isConnected && (
+          <div className="mb-8 space-y-6">
+            <GatewayBalanceCard />
+            <PortfolioStats data={portfolioStats} />
+          </div>
+        )}
+
+        {isConnected && portfolio.length > 0 && (
+          <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+              <h2 className="text-white text-xl font-bold">Your Holdings</h2>
+              <Link href="/investor/marketplace">
+                <Button variant="secondary" size="sm">
+                  <span className="material-symbols-outlined text-sm mr-2">storefront</span>
+                  Marketplace
+                </Button>
+              </Link>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-800">
+                    <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-4">
+                      Company
+                    </th>
+                    <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-4">
+                      Shares
+                    </th>
+                    <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-4">
+                      Price (USDC)
+                    </th>
+                    <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-6 py-4">
+                      Value
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {holdings.map((holding) => (
+                    <tr
+                      key={holding.companyId}
+                      className="border-b border-slate-800/50 hover:bg-slate-800/30"
+                    >
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="text-white font-medium">{holding.company}</p>
+                          <p className="text-slate-400 text-sm">{holding.ticker}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right text-white">
+                        {holding.shares.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-right text-slate-400">
+                        ${holding.sharePrice.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 text-right text-white font-bold">
+                        ${holding.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {isConnected && portfolio.length === 0 && (
+          <div className="bg-slate-900 rounded-xl border border-slate-800 p-12 text-center">
+            <p className="text-slate-400 mb-4">No holdings yet</p>
+            <Link href="/investor/marketplace">
+              <Button>
+                <span className="material-symbols-outlined text-sm mr-2">storefront</span>
+                Browse Marketplace
+              </Button>
+            </Link>
+          </div>
+        )}
+
+        {!isConnected && (
+          <div className="bg-slate-900 rounded-xl border border-slate-800 p-12 text-center">
+            <p className="text-slate-400">Connect your wallet to view your portfolio</p>
+          </div>
+        )}
+      </main>
+    </div>
+  );
 }
