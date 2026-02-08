@@ -2,9 +2,33 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount } from "wagmi";
 import { ArcLogo } from "@/components/icons/ArcLogo";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+
+const CHAIN_NAMES: Record<number, string> = {
+  11155111: "Sepolia",
+  43113: "Avalanche Fuji",
+  84532: "Base Sepolia",
+  5042002: "Arc Testnet",
+};
+
+function InvestorChainIndicator() {
+  const { address, isConnected, chainId } = useAccount();
+  if (!isConnected || !address) return null;
+  const truncated = `${address.slice(0, 6)}...${address.slice(-4)}`;
+  return (
+    <div className="hidden sm:flex items-center gap-2 bg-slate-800/50 border border-slate-700 px-3 py-1.5 rounded-lg">
+      <div className="size-2 rounded-full bg-emerald-500" />
+      <span className="text-xs font-medium text-slate-300">
+        {chainId ? CHAIN_NAMES[chainId] ?? `Chain ${chainId}` : "—"}
+      </span>
+      <span className="text-xs text-slate-500">{truncated}</span>
+    </div>
+  );
+}
 
 const investorNavItems = [
     { href: "/investor/dashboard", label: "Dashboard", icon: "dashboard" },
@@ -46,26 +70,14 @@ export function InvestorHeader() {
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-4">
-                {/* Wallet Connected */}
-                <div className="hidden sm:flex items-center gap-2 bg-slate-800/50 border border-slate-700 px-3 py-1.5 rounded-lg">
-                    <div className="size-2 rounded-full bg-emerald-500" />
-                    <span className="text-xs font-medium text-slate-300">Ethereum</span>
-                    <span className="text-xs text-slate-500">0x8f...4e21</span>
-                </div>
-
-                {/* Profile Button */}
+                <InvestorChainIndicator />
                 <Link href="/investor/profile">
                     <Button variant="ghost" size="sm" className="gap-2">
                         <span className="material-symbols-outlined text-lg">person</span>
                         <span className="hidden sm:inline">Profile</span>
                     </Button>
                 </Link>
-
-                {/* Wallet Button (for mobile / reconnect) */}
-                <Button size="sm" className="gap-2">
-                    <span className="material-symbols-outlined text-lg">account_balance_wallet</span>
-                    <span className="hidden sm:inline">Wallet</span>
-                </Button>
+                <ConnectButton />
             </div>
         </header>
     );

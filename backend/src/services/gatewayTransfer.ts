@@ -79,6 +79,10 @@ export async function completeGatewayTransfer(
         transport: http(config.arcRpcUrl),
     });
 
+    // 0. Pre-check: ensure company pool has shares and backend approval (before burning user's USDC)
+    const { checkPoolForSettlement } = await import("./investment.js");
+    await checkPoolForSettlement({ companyId, shareAmount });
+
     // 1. Get attestation from Gateway API
     const attestationResponse = await createTransferAttestation([
         signedBurnIntent,
@@ -99,15 +103,25 @@ export async function completeGatewayTransfer(
         { account },
     );
 
-    await publicClient.waitForTransactionReceipt({ hash: mintTxHash });
+    const mintReceipt = await publicClient.waitForTransactionReceipt({ hash: mintTxHash });
+    console.log("[Gateway] gatewayMint success, block:", mintReceipt.blockNumber);
 
-    // 3. Settlement - Treasury.deposit + mintShares
+    // Gateway deducts fees from transfer; actual received = value - fees.total
+    const specValue = (signedBurnIntent.burnIntent as { spec?: { value?: string } })?.spec?.value;
+    const valueWei = specValue ? BigInt(specValue) : parseUnits(usdcAmount, 6);
+    const feesTotal = attestationResponse.fees?.total ?? "0";
+    const feesWei = parseUnits(feesTotal, 6);
+    const receivedAmountWei = valueWei > feesWei ? valueWei - feesWei : valueWei;
+    console.log("[Gateway] valueWei=%s feesWei=%s receivedAmountWei=%s", valueWei.toString(), feesWei.toString(), receivedAmountWei.toString());
+
+    // 3. Settlement - Treasury.deposit + mintShares (use actual received amount)
     const { executeSettlement } = await import("./investment.js");
     const settlementResult = await executeSettlement({
         companyId,
         investorAddress,
         usdcAmount,
         shareAmount,
+        receivedAmountWei,
     });
 
     return {

@@ -25,7 +25,7 @@ export function TreasuryStats({ data = defaultData }: TreasuryStatsProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <StatCard
                 title="Treasury Balance"
-                value={`$${data.balance.toLocaleString()}.00`}
+                value={`$${data.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 trend={{ value: data.balanceChange }}
             />
             <StatCard

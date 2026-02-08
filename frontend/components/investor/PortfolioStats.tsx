@@ -16,22 +16,22 @@ interface PortfolioStatsProps {
 }
 
 const defaultData: PortfolioData = {
-    totalInvested: 36302,
-    sharesOwned: 400,
-    dividendsReceived: 842,
-    companiesCount: 3,
-    monthlyGrowth: 12.5,
-    yieldPercentage: 2.3,
+    totalInvested: 0,
+    sharesOwned: 0,
+    dividendsReceived: 0,
+    companiesCount: 0,
+    monthlyGrowth: 0,
+    yieldPercentage: 0,
 };
 
 export function PortfolioStats({ data = defaultData }: PortfolioStatsProps) {
     return (
         <div className="flex flex-wrap gap-4">
             <StatCard
-                title="Total Invested (USDC)"
-                value={`$${data.totalInvested.toLocaleString()}.00`}
+                title="Portfolio Value (USDC)"
+                value={`$${data.totalInvested.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 icon="monetization_on"
-                trend={{ value: data.monthlyGrowth, label: "this month" }}
+                trend={data.monthlyGrowth !== 0 ? { value: data.monthlyGrowth, label: "this month" } : undefined}
                 className="flex-1 min-w-[200px]"
             />
             <StatCard
@@ -43,9 +43,9 @@ export function PortfolioStats({ data = defaultData }: PortfolioStatsProps) {
             />
             <StatCard
                 title="Dividends Received"
-                value={`+ $${data.dividendsReceived.toLocaleString()}.00`}
+                value={`$${data.dividendsReceived.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 icon="payments"
-                subtitle={`Net yield ${data.yieldPercentage}%`}
+                subtitle={data.yieldPercentage > 0 ? `Net yield ${data.yieldPercentage}%` : undefined}
                 className="flex-1 min-w-[200px] [&>p:nth-child(2)]:text-emerald-500"
             />
         </div>

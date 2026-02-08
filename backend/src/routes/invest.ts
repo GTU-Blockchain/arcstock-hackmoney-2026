@@ -5,7 +5,7 @@ import {
 } from "../services/investment.js";
 import { completeGatewayTransfer } from "../services/gatewayTransfer.js";
 import { createBurnIntent } from "../gateway/burnIntent.js";
-import { getBalances } from "../gateway/client.js";
+import { getBalances, getDeposits } from "../gateway/client.js";
 import { config } from "../config.js";
 import { parseUnits } from "viem";
 
@@ -144,6 +144,18 @@ investRoutes.post("/settlement", async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/invest/backend-address
+ * Backend wallet address - issuer must approve this for pool sales (EquityToken.approve(backend, amount))
+ */
+investRoutes.get("/backend-address", (_req: Request, res: Response) => {
+    const backendWallet = config.backendWallet;
+    if (!backendWallet) {
+        return res.status(500).json({ error: "Backend wallet not configured" });
+    }
+    return res.json({ backendWallet });
+});
+
+/**
  * GET /api/invest/balances/:address
  * Get Gateway USDC balance for an address
  */
@@ -151,8 +163,14 @@ investRoutes.get("/balances/:address", async (req: Request, res: Response) => {
     try {
         const { address } = req.params;
         const domains = [0, 1, 6, 26]; // Sepolia, Avalanche, Base, Arc
-        const result = await getBalances(address, domains);
-        return res.json(result);
+        const [balancesResult, depositsResult] = await Promise.all([
+            getBalances(address, domains),
+            getDeposits(address, domains).catch(() => ({ token: "USDC", deposits: [] })),
+        ]);
+        return res.json({
+            ...balancesResult,
+            pendingDeposits: depositsResult.deposits,
+        });
     } catch (err) {
         console.error("Balances error:", err);
         return res.status(500).json({ error: String(err) });
@@ -179,3 +197,64 @@ investRoutes.get(
         }
     },
 );
+
+/**
+ * GET /api/invest/debug/balance
+ * Debug: backend wallet USDC balance (ERC-20 balanceOf) for diagnosing TransferFailed
+ */
+investRoutes.get("/debug/balance", async (_req: Request, res: Response) => {
+    try {
+        const { createPublicClient, http } = await import("viem");
+        const { config } = await import("../config.js");
+        const arcChain = {
+            id: config.arcChainId,
+            name: "Arc Testnet",
+            nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 6 },
+            rpcUrls: { default: { http: [config.arcRpcUrl] } },
+        } as const;
+        const client = createPublicClient({
+            chain: arcChain,
+            transport: http(config.arcRpcUrl),
+        });
+        const backendWallet = config.backendWallet;
+        if (!backendWallet) {
+            return res.status(500).json({ error: "Backend wallet not configured" });
+        }
+        const usdcAbi = [
+            { inputs: [{ name: "account", type: "address" }], name: "balanceOf", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" },
+        ] as const;
+        const balance = await client.readContract({
+            address: config.usdc,
+            abi: usdcAbi,
+            functionName: "balanceOf",
+            args: [backendWallet],
+        });
+        // Also check Treasury's USDC address and allowance
+        const pk = process.env.PRIVATE_KEY as `0x${string}` | undefined;
+        const allowance = pk
+            ? await client.readContract({
+                address: config.usdc,
+                abi: [{ inputs: [{ name: "owner", type: "address" }, { name: "spender", type: "address" }], name: "allowance", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" }],
+                functionName: "allowance",
+                args: [backendWallet, config.treasury],
+            })
+            : null;
+        const treasuryUsdc = await client.readContract({
+            address: config.treasury,
+            abi: [{ inputs: [], name: "usdc", outputs: [{ name: "", type: "address" }], stateMutability: "view", type: "function" }],
+            functionName: "usdc",
+        });
+        return res.json({
+            backendWallet,
+            usdcAddress: config.usdc,
+            treasuryUsdcAddress: treasuryUsdc,
+            usdcMatch: treasuryUsdc.toLowerCase() === config.usdc.toLowerCase(),
+            balanceWei: balance.toString(),
+            balanceHuman: (Number(balance) / 1e6).toFixed(6),
+            allowanceToTreasury: allowance?.toString() ?? "N/A",
+        });
+    } catch (err) {
+        console.error("Debug balance error:", err);
+        return res.status(500).json({ error: String(err) });
+    }
+});

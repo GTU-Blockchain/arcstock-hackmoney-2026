@@ -26,14 +26,7 @@ const statusLabels: Record<CompanyStatus, string> = {
     closed: "Closed",
 };
 
-const defaultCompanies: Company[] = [
-    { id: "1", name: "Tesla Inc.", ticker: "TSLA-EQ", sector: "technology", isVerified: true, status: "open", sharePrice: 142.68, totalSupply: 1000000, treasuryBalance: 5200000, marketCap: 2400000000, createdAt: new Date() },
-    { id: "2", name: "SpaceX", ticker: "SPACEX-EQ", sector: "technology", isVerified: true, status: "open", sharePrice: 102.40, totalSupply: 500000, treasuryBalance: 3100000, marketCap: 1200000000, createdAt: new Date() },
-    { id: "3", name: "Stripe", ticker: "STRIPE-EQ", sector: "finance", isVerified: true, status: "open", sharePrice: 48.90, totalSupply: 800000, treasuryBalance: 2800000, marketCap: 850000000, createdAt: new Date() },
-    { id: "4", name: "Rivian", ticker: "RIVN-EQ", sector: "energy", isVerified: true, status: "paused", sharePrice: 22.15, totalSupply: 1200000, treasuryBalance: 1500000, marketCap: 420000000, createdAt: new Date() },
-];
-
-export function CompanyTable({ companies = defaultCompanies, onInvest = () => { } }: CompanyTableProps) {
+export function CompanyTable({ companies = [], onInvest = () => { } }: CompanyTableProps) {
     return (
         <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
             <table className="w-full text-left border-collapse">
@@ -47,6 +40,9 @@ export function CompanyTable({ companies = defaultCompanies, onInvest = () => { 
                         </th>
                         <th className="px-6 py-4 text-slate-900 dark:text-white text-sm font-bold uppercase tracking-wider">
                             Price (USDC)
+                        </th>
+                        <th className="px-6 py-4 text-slate-900 dark:text-white text-sm font-bold uppercase tracking-wider">
+                            Total Supply
                         </th>
                         <th className="px-6 py-4 text-slate-900 dark:text-white text-sm font-bold uppercase tracking-wider">
                             Status
@@ -76,6 +72,9 @@ export function CompanyTable({ companies = defaultCompanies, onInvest = () => { 
                             </td>
                             <td className="px-6 py-5 text-slate-500 dark:text-slate-400 text-sm font-medium">
                                 ${company.sharePrice.toFixed(2)}
+                            </td>
+                            <td className="px-6 py-5 text-slate-500 dark:text-slate-400 text-sm font-medium">
+                                {company.totalSupply.toLocaleString()}
                             </td>
                             <td className="px-6 py-5">
                                 <Badge

@@ -6,7 +6,10 @@ interface ChainDetectorProps {
 }
 
 export function ChainDetector({ chain, address }: ChainDetectorProps) {
-    const truncatedAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
+    const truncatedAddress =
+        address.length >= 14
+            ? `${address.slice(0, 6)}...${address.slice(-4)}`
+            : address;
 
     return (
         <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 dark:bg-primary/10 border border-primary/20">

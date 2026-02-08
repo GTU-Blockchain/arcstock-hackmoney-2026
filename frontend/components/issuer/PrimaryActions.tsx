@@ -31,6 +31,13 @@ const actions: ActionItem[] = [
         variant: "default",
     },
     {
+        icon: "verified_user",
+        title: "Approve Backend for Sales",
+        description: "Allow the settlement backend to transfer shares when investors buy.",
+        href: "/issuer/issue?mode=pool",
+        variant: "default",
+    },
+    {
         icon: "payments",
         title: "Distribute Dividends",
         description: "Instant distribution to all global shareholders.",
