@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/Button";
 import { ArcLogo } from "@/components/icons/ArcLogo";
 
@@ -9,6 +11,8 @@ type UserType = "investor" | "issuer";
 
 export default function LoginPage() {
     const [userType, setUserType] = useState<UserType>("investor");
+    const { isConnected } = useAccount();
+    const dashboardPath = userType === "investor" ? "/investor/dashboard" : "/issuer/dashboard";
 
     return (
         <div className="min-h-screen bg-slate-950 flex">
@@ -105,18 +109,22 @@ export default function LoginPage() {
                         )}
                     </div>
 
-                    {/* Connect Wallet Button */}
-                    <Link
-                        href={userType === "investor" ? "/investor/dashboard" : "/issuer/dashboard"}
-                        className="block"
-                    >
-                        <Button className="w-full" size="lg">
-                            <span className="material-symbols-outlined text-lg mr-2">
-                                account_balance_wallet
-                            </span>
-                            Connect Wallet
-                        </Button>
-                    </Link>
+                    {/* Connect Wallet + Continue */}
+                    <div className="space-y-3">
+                        <div className="flex justify-center">
+                            <ConnectButton />
+                        </div>
+                        {isConnected && (
+                            <Link href={dashboardPath} className="block">
+                                <Button className="w-full" size="lg">
+                                    Continue to {userType === "investor" ? "Investor" : "Issuer"} Dashboard
+                                </Button>
+                            </Link>
+                        )}
+                        <p className="text-center text-slate-500 text-xs">
+                            Brave kullanıyorsanız: brave://settings/web3 adresinde varsayılan cüzdanı &quot;Extensions&quot; (MetaMask) olarak ayarlayın.
+                        </p>
+                    </div>
 
                     {/* Alternative Options */}
                     <div className="flex items-center gap-4">

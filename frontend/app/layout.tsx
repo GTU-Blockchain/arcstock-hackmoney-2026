@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Web3Provider } from "@/components/providers/Web3Provider";
 
 export const metadata: Metadata = {
   title: "Arc Stock | Tokenized Equity From Any Chain",
@@ -42,7 +43,7 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased font-sans">
-        {children}
+        <Web3Provider>{children}</Web3Provider>
       </body>
     </html>
   );

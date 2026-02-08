@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount } from "wagmi";
 import { ArcLogo } from "@/components/icons/ArcLogo";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -16,6 +18,27 @@ const marketingNavItems = [
     { href: "#developers", label: "Developers" },
     { href: "#institutional", label: "Institutional" },
 ];
+
+function HeaderChainIndicator() {
+  const { address, isConnected, chainId } = useAccount();
+  const chainNames: Record<number, string> = {
+    11155111: "Sepolia",
+    43113: "Avalanche Fuji",
+    84532: "Base Sepolia",
+    5042002: "Arc Testnet",
+  };
+  if (!isConnected || !address) return null;
+  const truncated = `${address.slice(0, 6)}...${address.slice(-4)}`;
+  return (
+    <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg">
+      <div className="size-2 rounded-full bg-emerald-500" />
+      <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+        {chainId ? chainNames[chainId] ?? `Chain ${chainId}` : "Unknown"}
+      </span>
+      <span className="text-xs text-slate-400">{truncated}</span>
+    </div>
+  );
+}
 
 const appNavItems = [
     { href: "/dashboard", label: "Dashboard" },
@@ -75,17 +98,8 @@ export function Header({ variant = "marketing" }: HeaderProps) {
                         </>
                     ) : (
                         <>
-                            {/* Chain Indicator */}
-                            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg">
-                                <div className="size-2 rounded-full bg-emerald-500" />
-                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
-                                    Arbitrum
-                                </span>
-                                <span className="text-xs text-slate-400">...8f42</span>
-                            </div>
-                            <Button variant="primary" size="sm">
-                                Connect Wallet
-                            </Button>
+                            <HeaderChainIndicator />
+                            <ConnectButton />
                         </>
                     )}
                 </div>
